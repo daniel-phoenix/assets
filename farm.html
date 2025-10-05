@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🌾 DNX FARM ULTRA++</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.min.js"></script>
+<style>
+:root{--gold:#ffd700;--neon:#00ffd5}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden;}
+body{
+  background: radial-gradient(circle at center, #000 20%, #111 100%);
+  background-image: url('dnx_logo.png');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  color:#fff;
+  font-family:"Poppins",sans-serif;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+#langToggle{
+  position:fixed;
+  top:20px;
+  right:25px;
+  padding:8px 14px;
+  border-radius:10px;
+  background:rgba(0,0,0,.6);
+  border:1px solid var(--gold);
+  color:var(--gold);
+  cursor:pointer;
+  font-weight:700;
+  z-index:5;
+}
+.logo{
+  position:fixed;
+  top:20px;
+  left:25px;
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  background:url('dnx_logo.png') center/cover no-repeat;
+  box-shadow:0 0 20px rgba(255,215,0,.7);
+}
+h1{
+  font-size:clamp(30px,4.5vw,50px);
+  color:var(--gold);
+  text-shadow:0 0 40px rgba(255,215,0,.7);
+  margin-bottom:8px;
+}
+p{
+  opacity:.9;
+  margin-bottom:20px;
+  font-size:1.1em;
+}
+.card{
+  width:min(95%,800px);
+  background:rgba(0,0,0,.75);
+  border:2px solid var(--gold);
+  border-radius:22px;
+  box-shadow:0 0 45px rgba(255,215,0,.3),inset 0 0 40px rgba(255,215,0,.07);
+  padding:25px 18px 40px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  align-items:center;
+  backdrop-filter:blur(5px);
+}
+.stats{
+  width:100%;
+  margin-top:10px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;
+}
+.stat{
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--neon);
+  border-radius:14px;
+  padding:10px;
+}
+.stat .label{font-size:14px;opacity:.8}
+.stat .value{font-weight:700;color:var(--gold);}
+input{
+  width:80%;
+  padding:12px;
+  margin:16px auto;
+  border-radius:12px;
+  border:1px solid var(--neon);
+  background:rgba(0,0,0,.8);
+  color:var(--neon);
+  text-align:center;
+  font-size:16px;
+}
+button{
+  border:0;
+  border-radius:14px;
+  padding:12px 20px;
+  margin:6px;
+  font-weight:700;
+  cursor:pointer;
+  transition:.2s;
+}
+.btn{background:linear-gradient(90deg,#00ffd5,#00c8a7);color:#000;}
+.btn:hover{transform:scale(1.05);background:linear-gradient(90deg,#ffd700,#ff9d00);}
+.gold{background:linear-gradient(90deg,#ffd700,#ff9d00);color:#000;}
+footer{margin-top:15px;font-size:14px;color:#ccc;}
+#priceBox{margin:8px 0;color:var(--neon);font-size:16px;}
+svg{width:100%;max-width:700px;height:140px;margin:14px auto;}
+</style>
+</head>
+<body>
+<div class="logo"></div>
+<button id="langToggle">EN</button>
+<h1 id="title">🌾 DNX FARM ULTRA++</h1>
+<p id="subtitle">ระบบฟาร์มเต็มรูปแบบ รับรางวัลจากเหรียญ Dynamix</p>
+
+<div class="card">
+  <div class="stats">
+    <div class="stat"><div class="label" id="walletLabel">กระเป๋า</div><div id="waddr" class="value">—</div></div>
+    <div class="stat"><div class="label" id="balLabel">ยอด DNX ทั้งหมด</div><div id="bal" class="value">—</div></div>
+    <div class="stat"><div class="label" id="stakeLabel">ที่กำลัง Stake</div><div id="staked" class="value">—</div></div>
+    <div class="stat"><div class="label" id="pendLabel">รางวัลค้างรับ</div><div id="pending" class="value">—</div></div>
+  </div>
+
+  <div id="priceBox">ราคาปัจจุบัน DNX/BNB ≈ <span id="price">—</span></div>
+
+  <input id="amount" placeholder="กรอกจำนวน DNX" />
+  <div>
+    <button id="setMax" class="btn">MAX</button>
+    <button id="deposit" class="btn">💰 Deposit</button>
+    <button id="withdraw" class="btn">💎 Withdraw</button>
+    <button id="claim" class="btn">🎁 Claim</button>
+    <button id="refresh" class="btn gold">🔄 Refresh</button>
+  </div>
+
+  <svg id="chart" viewBox="0 0 700 140"><polyline fill="none" stroke="#00ffd5" stroke-width="3" points=""/></svg>
+  <footer>Powered by <b>DNX Finance</b> © 2025</footer>
+</div>
+
+<script>
+const CHEF='0x9D9649e1710eF013465C34146874F967EEE73B03';
+const TOKEN='0x7DB860CC9D7f64Ed1B39de6621ebc94440C8dc62';
+const ABIchef=["function deposit(uint256) external","function withdraw(uint256) external","function userInfo(address) view returns(uint256 amount,uint256 rewardDebt)","function accDNXPerShare() view returns(uint256)","function lastRewardBlock() view returns(uint256)","function rewardPerBlock() view returns(uint256)"];
+const ABItoken=["function balanceOf(address) view returns(uint256)","function decimals() view returns(uint8)","function allowance(address,address) view returns(uint256)","function approve(address,uint256) returns(bool)"];
+let provider,signer,chef,token,user,dec=18;
+const $=id=>document.getElementById(id);
+const fmt=v=>Number(ethers.formatUnits(v,dec)).toLocaleString(undefined,{maximumFractionDigits:6});
+async function connect(){
+ if(!window.ethereum)return alert(msg('needMM'));
+ provider=new ethers.BrowserProvider(window.ethereum);
+ await provider.send("eth_requestAccounts",[]);
+ signer=await provider.getSigner();user=await signer.getAddress();
+ chef=new ethers.Contract(CHEF,ABIchef,signer);token=new ethers.Contract(TOKEN,ABItoken,signer);
+ dec=await token.decimals();$('waddr').textContent=user.slice(0,6)+'...'+user.slice(-4);
+ refreshAll();setInterval(refreshAll,10000);
+}
+async function refreshAll(){
+ if(!signer)return;
+ const [bal,info]=await Promise.all([token.balanceOf(user),chef.userInfo(user)]);
+ $('bal').textContent=fmt(bal);$('staked').textContent=fmt(info.amount);
+ $('pending').textContent='⟳';updatePending(info);fetchPrice();drawChart();
+}
+async function updatePending(info){
+ const [acc,last,rpb,supply,block]=await Promise.all([chef.accDNXPerShare(),chef.lastRewardBlock(),chef.rewardPerBlock(),token.balanceOf(CHEF),provider.getBlockNumber()]);
+ let acc2=acc;if(block>Number(last)&&supply>0n){const reward=(BigInt(block)-BigInt(last))*rpb;acc2+=reward*1000000000000n/supply;}
+ const pending=(info.amount*acc2)/1000000000000n-info.rewardDebt;$('pending').textContent=fmt(pending);
+}
+async function act(fn){
+ try{
+  if(!signer)return alert(msg('needMM'));
+  const val=$('amount').value.trim();if(!val)return alert(msg('enterAmt'));
+  const amt=ethers.parseUnits(val,dec);
+  if(fn==='deposit'){const allowance=await token.allowance(user,CHEF);if(allowance<amt){const txa=await token.approve(CHEF,amt);await txa.wait();}}
+  const tx=await chef[fn](amt);await tx.wait();alert(msg('success'));$('amount').value='';refreshAll();
+ }catch(e){alert(msg('fail')+e.message);}
+}
+async function claim(){try{const tx=await chef.deposit(0);await tx.wait();alert(msg('claimed'));refreshAll();}catch(e){alert(msg('fail')+e.message);}}
+async function setMax(){const bal=await token.balanceOf(user);$('amount').value=Number(ethers.formatUnits(bal,dec)).toFixed(6);}
+$('deposit').onclick=()=>act('deposit');$('withdraw').onclick=()=>act('withdraw');
+$('claim').onclick=claim;$('refresh').onclick=refreshAll;$('setMax').onclick=setMax;
+connect();
+async function fetchPrice(){try{const res=await fetch("https://api.pancakeswap.info/api/v2/tokens/"+TOKEN);const data=await res.json();$('price').textContent=parseFloat(data.data.price_BNB).toFixed(8);}catch{$('price').textContent='—';}}
+async function drawChart(){const pts=Array.from({length:40},(_,i)=>[i*17,70+Math.sin(Date.now()/1000+i)*25]);$('chart').querySelector('polyline').setAttribute('points',pts.map(p=>p.join(',')).join(' '));}
+let lang='th';const text={th:{title:"🌾 DNX FARM ULTRA++",subtitle:"ระบบฟาร์มเต็มรูปแบบ รับรางวัลจากเหรียญ Dynamix",walletLabel:"กระเป๋า",balLabel:"ยอด DNX ทั้งหมด",stakeLabel:"ที่กำลัง Stake",pendLabel:"รางวัลค้างรับ",needMM:"⚠️ กรุณาติดตั้ง MetaMask ก่อน !",enterAmt:"กรุณากรอกจำนวน DNX !",success:"✅ สำเร็จ !",fail:"❌ ธุรกรรมล้มเหลว ",claimed:"🎁 รับรางวัลแล้ว !"},en:{title:"🌾 DNX FARM ULTRA++",subtitle:"Full-featured farming system — Earn rewards from Dynamix",walletLabel:"Wallet",balLabel:"DNX Balance",stakeLabel:"Staked",pendLabel:"Pending Reward",needMM:"⚠️ Please install MetaMask first!",enterAmt:"Please enter DNX amount!",success:"✅ Success!",fail:"❌ Transaction failed: ",claimed:"🎁 Reward claimed!"}};
+function msg(k){return text[lang][k]||k;}
+$('langToggle').onclick=()=>{lang=lang==='th'?'en':'th';$('langToggle').textContent=lang==='th'?'EN':'TH';for(const k of ['title','subtitle','walletLabel','balLabel','stakeLabel','pendLabel'])$(k).textContent=text[lang][k];};
+</script>
+</body>
+</html>
